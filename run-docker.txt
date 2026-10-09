@@ -1,0 +1,55 @@
+# for mongodb based 
+
+version: "3.9"
+
+networks:
+  klingelnberg-net:
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: klingelnberg-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - klingelnberg-net
+
+  app:
+    image: imspiderman/machines:latest
+    container_name: klingelnberg-app
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      StorageMode: MONGO_DB
+      MongoDbSettings__ConnectionString: mongodb://mongodb:27017
+      MongoDbSettings__DatabaseName: KlingelnbergMachineManagement
+      MongoDbSettings__CollectionName: MachineAssetMappings
+    networks:
+      - klingelnberg-net
+
+volumes:
+  mongo_data:
+
+# for file based 
+version: "3.9"
+
+services:
+  app:
+    image: imspiderman/machines:latest
+    container_name: klingelnberg-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      StorageMode: FILE
+      DataFilePath: Data/matrix.txt
+    volumes:
+      - ./Data:/app/Data

@@ -1,0 +1,126 @@
+﻿@page "/direct/machines-by-asset"
+@using KlingelnbergMachineManagement.Services
+@using KlingelnbergMachineManagement.Application.Services
+@using KlingelnbergMachineManagement.Application.DTOs
+@inject IMachineService Service
+
+<PageTitle>Machines by Asset (Direct)</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <h4>Find Machines by Asset Name</h4>
+        <span class="badge bg-primary">Direct Access</span>
+    </div>
+
+    <p class="text-muted">Select an asset to view all machines that use it. Data retrieved directly from service layer.</p>
+
+    <div class="card mt-3">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label"><strong>Select Asset Name:</strong></label>
+                    <select class="form-select" @bind="selectedAsset">
+                        <option value="">-- Select an Asset --</option>
+                        @foreach (var asset in allAssets)
+                        {
+                            <option value="@asset">@asset</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <button class="btn btn-primary" @onclick="SearchMachines" disabled="@string.IsNullOrEmpty(selectedAsset)">
+                        <i class="bi bi-search"></i> Search
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center mt-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading machines...</p>
+        </div>
+    }
+    else if (machines != null && machines.Any())
+    {
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5><i class="bi bi-cpu-fill"></i> Machines Using "@selectedAsset"</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    @foreach (var machine in machines)
+                    {
+                        <li class="list-group-item">
+                            <i class="bi bi-check-circle text-success"></i> @machine
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    }
+    else if (searchPerformed && (machines == null || !machines.Any()))
+    {
+        <div class="alert alert-warning mt-4" role="alert">
+            <i class="bi bi-exclamation-triangle"></i>
+            No machines found using asset <strong>@selectedAsset</strong>.
+        </div>
+    }
+
+    <div class="mt-4">
+        <a href="/" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Home
+        </a>
+        <a href="/api/machines-by-asset" class="btn btn-outline-success ms-2">
+            <i class="bi bi-arrow-right"></i> Try API Version
+        </a>
+    </div>
+</div>
+
+@code {
+    private IEnumerable<string> allAssets = Enumerable.Empty<string>();
+    private string selectedAsset = string.Empty;
+    private IEnumerable<string>? machines;
+    private bool isLoading = false;
+    private bool searchPerformed = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allAssets = await Service.GetAllAssetNamesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading assets: {ex.Message}");
+        }
+    }
+
+    private async Task SearchMachines()
+    {
+        if (string.IsNullOrWhiteSpace(selectedAsset))
+            return;
+
+        isLoading = true;
+        searchPerformed = true;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            machines = await Service.GetMachinesByAssetNameAsync(selectedAsset);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error searching machines: {ex.Message}");
+            machines = new List<string>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

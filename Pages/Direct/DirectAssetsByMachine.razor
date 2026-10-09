@@ -1,0 +1,132 @@
+﻿@page "/direct/assets-by-machine"
+@using KlingelnbergMachineManagement.Services
+@using KlingelnbergMachineManagement.Application.Services
+@using KlingelnbergMachineManagement.Application.DTOs
+@inject IMachineService Service
+
+<PageTitle>Assets by Machine (Direct)</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <h4>Find Assets by Machine Type</h4>
+        <span class="badge bg-primary">Direct Access</span>
+    </div>
+
+    <p class="text-muted">Select a machine type to view all assets it uses. Data retrieved directly from service layer.</p>
+
+    <div class="card mt-3">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label"><strong>Select Machine Type:</strong></label>
+                    <select class="form-select" @bind="selectedMachine">
+                        <option value="">-- Select a Machine --</option>
+                        @foreach (var machine in allMachines)
+                        {
+                            <option value="@machine">@machine</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <button class="btn btn-primary" @onclick="SearchAssets" disabled="@string.IsNullOrEmpty(selectedMachine)">
+                        <i class="bi bi-search"></i> Search
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center mt-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading assets...</p>
+        </div>
+    }
+    else if (assets != null && assets.Any())
+    {
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5><i class="bi bi-gear-fill"></i> Assets Used by @selectedMachine</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    @foreach (var asset in assets)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                                <i class="bi bi-check-circle text-success"></i>
+                                <strong>@asset.AssetName</strong>
+                            </span>
+                            <span class="badge bg-secondary">
+                                Series: @asset.SeriesNumber
+                            </span>
+                        </li>
+                    }
+
+                </ul>
+            </div>
+        </div>
+    }
+    else if (searchPerformed && (assets == null || !assets.Any()))
+    {
+        <div class="alert alert-warning mt-4" role="alert">
+            <i class="bi bi-exclamation-triangle"></i>
+            No assets found for machine type <strong>@selectedMachine</strong>.
+        </div>
+    }
+
+    <div class="mt-4">
+        <a href="/" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Home
+        </a>
+        <a href="/api/assets-by-machine" class="btn btn-outline-success ms-2">
+            <i class="bi bi-arrow-right"></i> Try API Version
+        </a>
+    </div>
+</div>
+
+@code {
+    private IEnumerable<string> allMachines = Enumerable.Empty<string>();
+    private string selectedMachine = string.Empty;
+    private IEnumerable<AssetWithSeriesDto>? assets;
+    private bool isLoading = false;
+    private bool searchPerformed = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allMachines = await Service.GetAllMachineTypesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading machines: {ex.Message}");
+        }
+    }
+
+    private async Task SearchAssets()
+    {
+        if (string.IsNullOrWhiteSpace(selectedMachine))
+            return;
+
+        isLoading = true;
+        searchPerformed = true;
+
+        try
+        {
+            assets = await Service.GetAssetsByMachineTypeAsync(selectedMachine);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error searching assets: {ex.Message}");
+            assets = new List<AssetWithSeriesDto>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

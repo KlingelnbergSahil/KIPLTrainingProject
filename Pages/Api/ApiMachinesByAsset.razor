@@ -1,0 +1,185 @@
+﻿@page "/api/machines-by-asset"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>Machines by Asset (API)</PageTitle>
+
+<div class="container-fluid mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <h4>Find Machines by Asset Name</h4>
+        <span class="badge bg-primary">API Access</span>
+    </div>
+
+    <p class="text-muted">
+        Select an asset to view all machines that use it.
+        Data retrieved via REST API.
+    </p>
+
+    <!-- Selection -->
+    <div class="card mt-3">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label">
+                        <strong>Select Asset Name:</strong>
+                    </label>
+
+                    <select class="form-select" @bind="selectedAsset">
+                        <option value="">-- Select an Asset --</option>
+                        @foreach (var asset in allAssets)
+                        {
+                            <option value="@asset">@asset</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-6 d-flex align-items-end">
+                    <button class="btn btn-success"
+                            @onclick="SearchMachines"
+                            disabled="@string.IsNullOrEmpty(selectedAsset)">
+                        <i class="bi bi-search"></i> Search via API
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API endpoint -->
+    @if (!string.IsNullOrEmpty(apiEndpoint))
+    {
+        <div class="mt-3">
+            <small class="text-muted">
+                <strong>API Endpoint:</strong>
+                <code>@apiEndpoint</code>
+            </small>
+        </div>
+    }
+
+    <!-- Loading -->
+    @if (isLoading)
+    {
+        <div class="text-center mt-4">
+            <div class="spinner-border text-success"></div>
+            <p class="mt-2">Calling API...</p>
+        </div>
+    }
+    else if (machines.Any())
+    {
+        <!-- Results -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>
+                    <i class="bi bi-cpu-fill"></i>
+                    Machines Using "@selectedAsset"
+                </h5>
+            </div>
+
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    @foreach (var machine in machines)
+                    {
+                        <li class="list-group-item">
+                            <i class="bi bi-check-circle text-success"></i>
+                            @machine
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    }
+    else if (searchPerformed)
+    {
+        <div class="alert alert-warning mt-4">
+            <i class="bi bi-exclamation-triangle"></i>
+            No machines found using asset
+            <strong>@selectedAsset</strong>.
+        </div>
+    }
+
+    <!-- Error -->
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-4">
+            <i class="bi bi-x-circle"></i> @errorMessage
+        </div>
+    }
+
+    <!-- Navigation -->
+    <div class="mt-4">
+        <a href="/" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Home
+        </a>
+        <a href="/direct/machines-by-asset"
+           class="btn btn-outline-primary ms-2">
+            <i class="bi bi-arrow-right"></i> Try Direct Version
+        </a>
+    </div>
+</div>
+
+@code {
+
+    private List<string> allAssets = new();
+    private List<string> machines = new();
+
+    private string selectedAsset = string.Empty;
+    private bool isLoading;
+    private bool searchPerformed;
+
+    private string? errorMessage;
+    private string? apiEndpoint;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var baseUrl = Navigation.BaseUri;
+
+            allAssets =
+                await Http.GetFromJsonAsync<List<string>>(
+                    $"{baseUrl}api/assets")
+                ?? new();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading assets: {ex.Message}";
+        }
+    }
+
+    private async Task SearchMachines()
+    {
+        if (string.IsNullOrWhiteSpace(selectedAsset))
+            return;
+
+        isLoading = true;
+        searchPerformed = true;
+        errorMessage = null;
+        machines.Clear();
+
+        try
+        {
+            var baseUrl = Navigation.BaseUri;
+            var encodedAsset = Uri.EscapeDataString(selectedAsset);
+
+            apiEndpoint =
+                $"GET {baseUrl}api/machines/by-asset?assetName={encodedAsset}";
+
+            machines =
+                await Http.GetFromJsonAsync<List<string>>(
+                    $"{baseUrl}api/machines/by-asset?assetName={encodedAsset}")
+                ?? new();
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"API Error: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

@@ -1,0 +1,36 @@
+version: "3.9"
+
+networks:
+  klingelnberg-net:
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: klingelnberg-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+    networks:
+      - klingelnberg-net
+
+  app:
+    build: .
+    container_name: klingelnberg-app
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      MongoDbSettings__ConnectionString: mongodb://mongodb:27017
+      MongoDbSettings__DatabaseName: KlingelnbergMachineManagement
+      MongoDbSettings__CollectionName: MachineAssetMappings
+      StorageMode: MONGO_DB
+    networks:
+      - klingelnberg-net
+
+volumes:
+  mongo_data:

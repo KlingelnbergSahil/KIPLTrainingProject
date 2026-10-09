@@ -1,0 +1,181 @@
+﻿@page "/api/assets-by-machine"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@using KlingelnbergMachineManagement.Application.DTOs
+
+<PageTitle>Assets by Machine (API)</PageTitle>
+
+<div class="container-fluid mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <h4>Find Assets by Machine Type</h4>
+        <span class="badge bg-primary">API Access</span>
+    </div>
+
+    <p class="text-muted">
+        Select a machine type to view all assets it uses.
+        Data retrieved via REST API.
+    </p>
+
+    <div class="card mt-3">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label"><strong>Select Machine Type:</strong></label>
+                    <select class="form-select" @bind="selectedMachine">
+                        <option value="">-- Select a Machine --</option>
+                        @foreach (var machine in allMachines)
+                        {
+                            <option value="@machine">@machine</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-6 d-flex align-items-end">
+                    <button class="btn btn-success"
+                            @onclick="SearchAssets"
+                            disabled="@string.IsNullOrEmpty(selectedMachine)">
+                        <i class="bi bi-search"></i> Search via API
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(apiEndpoint))
+    {
+        <div class="mt-3">
+            <small class="text-muted">
+                <strong>API Endpoint:</strong>
+                <code>@apiEndpoint</code>
+            </small>
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="text-center mt-4">
+            <div class="spinner-border text-success"></div>
+            <p class="mt-2">Calling API...</p>
+        </div>
+    }
+    else if (assets.Any())
+    {
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>
+                    <i class="bi bi-gear-fill"></i>
+                    Assets Used by @selectedMachine
+                </h5>
+            </div>
+
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    @foreach (var asset in assets)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                                <i class="bi bi-check-circle text-success"></i>
+                                <strong>@asset.AssetName</strong>
+                            </span>
+                            <span class="badge bg-secondary">
+                                Series: @asset.SeriesNumber
+                            </span>
+                        </li>
+                    }
+
+                </ul>
+            </div>
+        </div>
+    }
+    else if (searchPerformed)
+    {
+        <div class="alert alert-warning mt-4">
+            <i class="bi bi-exclamation-triangle"></i>
+            No assets found for machine
+            <strong>@selectedMachine</strong>.
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-4">
+            <i class="bi bi-x-circle"></i> @errorMessage
+        </div>
+    }
+
+    <div class="mt-4">
+        <a href="/" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Home
+        </a>
+        <a href="/direct/assets-by-machine"
+           class="btn btn-outline-primary ms-2">
+            <i class="bi bi-arrow-right"></i> Try Direct Version
+        </a>
+    </div>
+</div>
+
+@code {
+    private List<string> allMachines = new();
+    private List<AssetWithSeriesDto> assets = new();
+
+
+    private string selectedMachine = string.Empty;
+    private bool isLoading;
+    private bool searchPerformed;
+
+    private string? errorMessage;
+    private string? apiEndpoint;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var baseUrl = Navigation.BaseUri;
+
+            allMachines =
+                await Http.GetFromJsonAsync<List<string>>(
+                    $"{baseUrl}api/machines")
+                ?? new();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading machines: {ex.Message}";
+        }
+    }
+
+    private async Task SearchAssets()
+    {
+        if (string.IsNullOrWhiteSpace(selectedMachine))
+            return;
+
+        isLoading = true;
+        searchPerformed = true;
+        errorMessage = null;
+        assets.Clear();
+
+        try
+        {
+            var baseUrl = Navigation.BaseUri;
+            var encodedMachine = Uri.EscapeDataString(selectedMachine);
+
+
+            apiEndpoint =$"GET {baseUrl}api/assets/by-machine?machineType={encodedMachine}";
+
+            assets = await Http.GetFromJsonAsync<List<AssetWithSeriesDto>>($"{baseUrl}api/assets/by-machine?machineType={encodedMachine}") ?? new();
+
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"API Error: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
